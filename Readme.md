@@ -1,4 +1,9 @@
-# Variational Autoencoder 
+# Data Links
+Add these files to your data folder:  
+Found here: [runwayml/stable-diffiusion-v1-5](https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/main)
+- [tokenizer_merges.txt](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/tokenizer/merges.txt)
+- [tokenizer_vocab.json](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/tokenizer/vocab.json)
+- [v1-5-pruned-emaonly.ckpt](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned-emaonly.ckpt)
 
 ## Key Concepts
 **torch.nn.Convo2d :**  
