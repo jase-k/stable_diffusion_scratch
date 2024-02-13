@@ -123,7 +123,7 @@ class UNET_AttentionBlock(nn.Module):
         n, c, h, w = x.shape
 
         # (Batch_Size, Features, Height, Width) -> (Batch_Size, Features, Height * Width)
-        x = x.view(n, c, h * w)
+        x = x.view((n, c, h * w))
 
         # (Batch_Size, Features, Height * Width) -> (Batch_Size, Height * Width, Features)
         # >>> y
@@ -169,7 +169,7 @@ class UNET_AttentionBlock(nn.Module):
         # (Batch_Size, Height * Width, Features) -> (Batch_Size, Features, Height * Width)
         x = x.transpose(-1, -2)
 
-        x = x.view(n, c, h, w)
+        x = x.view((n, c, h, w))
 
         return self.conv_output(x) + residue_long
 
