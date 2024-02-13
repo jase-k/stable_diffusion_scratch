@@ -5,10 +5,10 @@ from attention import SelfAttention
 
 class VAE_AttentionBlock(nn.Module):
 
-    def __init__(self, in_channels: int):
+    def __init__(self, channels: int):
         super().__init__()
-        self.groupnorm = nn.GroupNorm(32, in_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
-        self.attention = SelfAttention(1, in_channels) 
+        self.groupnorm = nn.GroupNorm(32, channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
+        self.attention = SelfAttention(1, channels) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         #  x: (Batch_Size, Channel, Height, Width)
