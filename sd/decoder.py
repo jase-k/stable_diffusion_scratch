@@ -7,8 +7,8 @@ class VAE_AttentionBlock(nn.Module):
 
     def __init__(self, in_channels: int):
         super().__init__()
-        self.group_norm = nn.GroupNorm(32, in_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
-        self.attention = SelfAttention(in_channels) 
+        self.groupnorm = nn.GroupNorm(32, in_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
+        self.attention = SelfAttention(1, in_channels) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         #  x: (Batch_Size, Channel, Height, Width)
@@ -37,11 +37,11 @@ class VAE_AttentionBlock(nn.Module):
 class VAE_ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.group_norm_1 = nn.GroupNorm(32, in_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
+        self.groupnorm_1 = nn.GroupNorm(32, in_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
         self.conv_1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1) # Convusional Visualizer: https://ezyang.github.io/convolution-visualizer/
 
-        self.group_norm_2 = nn.GroupNorm(32, in_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
-        self.conv_2 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1) # Convusional Visualizer: https://ezyang.github.io/convolution-visualizer/
+        self.groupnorm_2 = nn.GroupNorm(32, out_channels) # Group Normalization: https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
+        self.conv_2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1) # Convusional Visualizer: https://ezyang.github.io/convolution-visualizer/
 
         # Skip Connection
         if in_channels == out_channels:
@@ -54,13 +54,13 @@ class VAE_ResidualBlock(nn.Module):
 
         residue = x
 
-        x = self.group_norm_1(x)
+        x = self.groupnorm_1(x)
 
         x = F.silu(x) # SiLU: https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
 
         x = self.conv_1(x)
 
-        x = self.group_norm_2(x)
+        x = self.groupnorm_2(x)
 
         x = F.silu(x) # SiLU: https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html
 

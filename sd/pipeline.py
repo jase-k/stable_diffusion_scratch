@@ -17,7 +17,7 @@ def generate(
         do_cfg=True, # cfg stands for classifier free guidance. 
         cfg_scale=7.5, # How much the model should pay attention to the prompt  -> This is the W in the classifier_free_guidance.png photo
         sampler_name="ddpm",
-        n_inferece_steps=50,
+        n_inference_steps=50,
         models={},
         seed=None,
         device=None,
@@ -29,9 +29,9 @@ def generate(
             raise ValueError("strength must be between 0 and 1")
         
         if idle_device:
-            to_idle: lambda x: x.to(idle_device)
+            to_idle = lambda x: x.to(idle_device)
         else:
-            to_idle: lambda x: x
+            to_idle = lambda x: x
 
         generator = torch.Generator(device=device)
 
@@ -67,11 +67,13 @@ def generate(
             tokens = torch.tensor(tokens, dtype=torch.long, device=device)
 
             context = clip(tokens)
+
         to_idle(clip)
 
+        # Sampler is referred to as the Scheduler in the diffusion.png image in images
         if sampler_name == "ddpm":
             sampler = DDPMSampler(generator)
-            sampler.set_inference_steps(n_inferece_steps)
+            sampler.set_inference_timesteps(n_inference_steps)
         else:
             raise ValueError(f"Unknown sampler {sampler_name}")
         
@@ -113,6 +115,7 @@ def generate(
         # This is the Unet Loop
         timesteps = tqdm(sampler.timesteps)
         for i, timestep in enumerate(timesteps):
+            print(f"Step {i} of {n_inference_steps} inference steps.")
             time_embedding = get_time_embedding(timestep).to(device)
 
             # (Batch_Size, 4, Latents_Height, Latents_Width)
@@ -171,7 +174,7 @@ def get_time_embedding(timestep: int):
     See positional_encoding.png in the images folder
     """
     # (160,)
-    freqs = torch.pow(10000, -torch.arange(start=0, end=100, dtype=torch.float32) / 160)
+    freqs = torch.pow(10000, -torch.arange(start=0, end=160, dtype=torch.float32) / 160)
     # (1,160)
     # [:,None] adds a new axis to the tensor like unsqueeze
     # >>> y.shape
@@ -181,7 +184,9 @@ def get_time_embedding(timestep: int):
     x = torch.tensor([timestep], dtype=torch.float32)[:,None] * freqs[None]
 
     # (1, 320)
-    return torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
+    x = torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
+
+    return x
 
 
 

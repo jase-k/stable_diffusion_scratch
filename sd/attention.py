@@ -17,7 +17,6 @@ class SelfAttention(nn.Module):
 
     def forward(self, x: torch.Tensor, causal_mask=False) -> torch.Tensor:
         # x: (Batch_Size, Seq_Len, Dim)
-
         input_shape = x.shape
         batch_size, seq_len, d_embed = input_shape
 
@@ -101,7 +100,7 @@ class CrossAttention(nn.Module):
 
         output = weight @ v
 
-        output = output.transpose(1, 2).continous()
+        output = output.transpose(1, 2).contiguous()
 
         output = output.view(input_shape)
 

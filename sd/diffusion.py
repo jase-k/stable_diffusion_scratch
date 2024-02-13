@@ -9,14 +9,15 @@ class TimeEmbedding(nn.Module):
 
     def __init__(self, n_embed: int):
         super().__init__()
-        self.linear1 = nn.Linear(n_embed, 4 * n_embed) # Linear: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-        self.linear2 = nn.Linear(4 * n_embed, 4 * n_embed) # Linear: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+        self.linear_1 = nn.Linear(n_embed, 4 * n_embed) # Linear: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+        self.linear_2 = nn.Linear(4 * n_embed, 4 * n_embed) # Linear: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (1, 320)
-        x = self.linear1(x)
+        
+        x = self.linear_1(x)
         x = F.silu(x)
-        x = self.linear2(x)
+        x = self.linear_2(x)
         # x: (1, 1280)
         return x
 
@@ -47,10 +48,10 @@ class UNET_ResidualBlock(nn.Module):
         self.conv_merged = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1) # Convusional Visualizer: https://ezyang.github.io/convolution-visualizer/
 
         if in_channels == out_channels:
-            self.residual = nn.Identity()
+            self.residual_layer = nn.Identity()
         else:
             # Notice kernel size is 1 so the shape isn't changed, but the number of channels / features is
-            self.residual = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
+            self.residual_layer = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
 
     def forward(self, feature: torch.Tensor, time: torch.Tensor) -> torch.Tensor:
         # feature: (Batch_Size, In_Channels, Height, Width)
@@ -84,7 +85,7 @@ class UNET_ResidualBlock(nn.Module):
 
         merged = self.conv_merged(merged)
 
-        return merged + self.residual(residue)
+        return merged + self.residual_layer(residue)
     
 # This is referred to as the Cross Attention Block as it adds the context from the clip model with the image
 class UNET_AttentionBlock(nn.Module):
@@ -100,7 +101,7 @@ class UNET_AttentionBlock(nn.Module):
         self.attention_1 = SelfAttention(n_heads, channels, in_proj_bias=False) 
 
         self.layernorm_2 = nn.LayerNorm(channels) # Layer Normalization: https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
-        self.attention_2 = CrossAttention(n_heads, channels, in_proj_bias=False) 
+        self.attention_2 = CrossAttention(n_heads, channels, d_context, in_proj_bias=False) 
 
         self.layernorm_3 = nn.LayerNorm(channels) # Layer Normalization: https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
 
@@ -161,7 +162,7 @@ class UNET_AttentionBlock(nn.Module):
         x, gate = self.linear_geglu_1(x).chunk(2, dim=-1)
         x = x * F.gelu(gate)
 
-        x = self.linerar_geglu_2(x)
+        x = self.linear_geglu_2(x)
 
         x += residue_short
 
@@ -184,6 +185,7 @@ class Upsample(nn.Module):
         # x: (Batch_Size, Channel, Height, Width) -> (Batch_Size, Channel, Height * 2, Width * 2)
         x = F.interpolate(x, scale_factor=2, mode="nearest") # Interpolate: https://pytorch.org/docs/stable/generated/torch.nn.functional.interpolate.html
         x = self.conv(x)
+        return x
 
 class UNET_OutputLayer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
@@ -205,7 +207,7 @@ class UNET(nn.Module):
         super().__init__()
 
         # Encoder; You'll notice a similar pattern of decreasing the spatial dimensions of the image but increasing the number of channels (features)
-        self.encoders = nn.Module([
+        self.encoders = nn.ModuleList([
             # (Batch_Size, 4, Height / 8 , Width / 8) -> (Batch_Size, 320, Height / 8 , Width / 8)
             SwitchSequential(nn.Conv2d(4, 320, kernel_size=3, padding=1)),
             SwitchSequential(UNET_ResidualBlock(320, 320), UNET_AttentionBlock(8, 40)),
@@ -237,7 +239,7 @@ class UNET(nn.Module):
         ])
 
         # This is the lowest point of the UNET see diffusion.png in images folder
-        self.bottle_neck = SwitchSequential(
+        self.bottleneck = SwitchSequential(
             UNET_ResidualBlock(1280, 1280),
             UNET_AttentionBlock(8, 160),
             UNET_ResidualBlock(1280, 1280),
@@ -274,16 +276,38 @@ class UNET(nn.Module):
 
             SwitchSequential(UNET_ResidualBlock(960, 320), UNET_AttentionBlock(8, 40)),
 
-            SwitchSequential(UNET_ResidualBlock(640 , 320), UNET_AttentionBlock(8, 80)),
+            SwitchSequential(UNET_ResidualBlock(640 , 320), UNET_AttentionBlock(8, 40)),
 
             SwitchSequential(UNET_ResidualBlock(640 , 320), UNET_AttentionBlock(8, 40)),
         ])
 
+    def forward(self, x, context, time):
+        # x: (Batch_Size, 4, Height / 8, Width / 8)
+        # context: (Batch_Size, Seq_Len, Dim) 
+        # time: (1, 1280)
+
+        skip_connections = []
+        for index, layers in enumerate(self.encoders):
+            print(f"Processing encoder layer {index}")
+            x = layers(x, context, time)
+            skip_connections.append(x)
+
+        x = self.bottleneck(x, context, time)
+
+        for index, layers in enumerate(self.decoders):
+            print(f"Processing decoder layer {index}")
+
+            # Since we always concat with the skip connection of the encoder, the number of features increases before being sent to the decoder's layer
+            x = torch.cat((x, skip_connections.pop()), dim=1) 
+            x = layers(x, context, time)
+        
+        return x
 
 # This is the unet
 class Diffusion(nn.Module):
 
     def __init__(self): 
+        super().__init__()
         self.time_embedding = TimeEmbedding(320)
         self.unet = UNET()
         self.final = UNET_OutputLayer(320,4)
