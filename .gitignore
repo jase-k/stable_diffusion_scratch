@@ -3,3 +3,5 @@ myenv/
 data
 __pycache__/
 *.pyc
+
+output_images/

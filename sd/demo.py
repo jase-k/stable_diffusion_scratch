@@ -4,10 +4,22 @@ from PIL import Image
 from pathlib import Path
 from transformers import CLIPTokenizer
 import torch
+import os
+import time
+
+### Setting up the Output Directory
+script_dir = os.path.dirname(__file__)
+
+# Build the absolute path for the output directory
+output_dir = os.path.join(script_dir, '..', 'output_images')
+
+# Ensure the output directory exists
+os.makedirs(output_dir, exist_ok=True)
+### Finished Setting up Output Directory
 
 DEVICE = "cpu"
 
-ALLOW_CUDA = False
+ALLOW_CUDA = True
 ALLOW_MPS = False
 
 if torch.cuda.is_available() and ALLOW_CUDA:
@@ -61,4 +73,6 @@ output_image = pipeline.generate(
 )
 
 # Combine the input image and the output image into a single image.
-Image.fromarray(output_image)
+import time
+timestamp = str(int(time.time()))
+Image.fromarray(output_image).save(f"../output_images/final_{timestamp}.png")
