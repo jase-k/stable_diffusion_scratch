@@ -35,7 +35,11 @@ class VAE_AttentionBlock(nn.Module):
         # (Batch_Size, Features, Height * Width) -> (Batch_Size, Features, Height, Width)
         x = x.view((n, c, h, w))
 
-        return x + residue
+        # (Batch_Size, Features, Height, Width) + (Batch_Size, Features, Height, Width) -> (Batch_Size, Features, Height, Width) 
+        x += residue
+
+        # (Batch_Size, Features, Height, Width)
+        return x
 
 class VAE_ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
