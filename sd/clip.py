@@ -13,7 +13,7 @@ class CLIPEmbedding(nn.Module):
         self.token_embedding = nn.Embedding(vocab_size, n_embed)
 
         # Adding positional context to the embeddings.. i.e. the position of the word in the sentence
-        self.position_embedding = nn.Parameter(torch.zeros(n_tokens, n_embed))
+        self.position_embedding = nn.Parameter(torch.zeros((n_tokens, n_embed)))
     
     def forward(self, tokens):
         x =  self.token_embedding(tokens)
@@ -50,7 +50,7 @@ class CLIPLayer(nn.Module):
         x = self.linear_1(x)
 
         # QuickGELU activation function
-        x = x * torch.sigmoid(1.702 + x) # Signmoid: https://pytorch.org/docs/stable/generated/torch.sigmoid.html
+        x = x * torch.sigmoid(1.702 * x) # Signmoid: https://pytorch.org/docs/stable/generated/torch.sigmoid.html
 
         x = self.linear_2(x)
 
@@ -66,7 +66,7 @@ class CLIP(nn.Module):
         self.embedding = CLIPEmbedding(49408, 768, 77)
 
         self.layers = nn.ModuleList([
-            CLIPLayer(12, 768) for i in rand(12)
+            CLIPLayer(12, 768) for i in range(12)
         ])
 
         self.layernorm= nn.LayerNorm(768) # Layer Normalization: https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
