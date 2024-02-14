@@ -141,7 +141,7 @@ class UNET_AttentionBlock(nn.Module):
         residue_short = x
 
         x = self.layernorm_1(x)
-        self.attention_1(x)
+        x = self.attention_1(x)
         x = x + residue_short
 
         residue_short = x
@@ -150,7 +150,7 @@ class UNET_AttentionBlock(nn.Module):
         x = self.layernorm_2(x)
 
         # Cross Attention
-        self.attention_2(x, context)
+        x = self.attention_2(x, context)
 
         x = x + residue_short
 
