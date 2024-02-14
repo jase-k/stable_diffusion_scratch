@@ -7,6 +7,19 @@ import torch
 import os
 import time
 
+# Total memory
+total_memory = torch.cuda.get_device_properties(0).total_memory
+
+# Allocated memory
+allocated_memory = torch.cuda.memory_allocated(0)
+
+# Cached memory
+cached_memory = torch.cuda.memory_reserved(0)
+
+print(f"Total GPU Memory: {total_memory / (1024 ** 3)} GB")
+print(f"Allocated Memory: {allocated_memory / (1024 ** 3)} GB")
+print(f"Cached Memory: {cached_memory / (1024 ** 3)} GB")
+
 ### Setting up the Output Directory
 script_dir = os.path.dirname(__file__)
 
