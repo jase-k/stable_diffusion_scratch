@@ -34,18 +34,19 @@ def generate(
             to_idle = lambda x: x
 
         generator = torch.Generator(device=device)
-
-        if seed is not None:
-            generator.manual_seed(seed)
+        if seed is None:
+            generator.seed()
         else:
-            generate.seed()
+            generator.manual_seed(seed)
         
         clip = models["clip"]
         clip.to(device)
 
         if do_cfg:
             # Conver the prompt into toekns using the tokenizer
-            cond_tokens = tokenizer.batch_encode_plus([prompt], padding="max_length", max_length=77).input_ids
+            cond_tokens = tokenizer.batch_encode_plus(
+                [prompt], padding="max_length", max_length=77
+            ).input_ids
 
             # (Batch_Size, Seq_Len)
             cond_tokens = torch.tensor(cond_tokens, dtype=torch.long, device=device)
@@ -53,7 +54,9 @@ def generate(
             # (Batch_Size, Seq_Len) -> (Batch_Size, Seq_Len, Dim)
             cond_context = clip(cond_tokens)
 
-            uncond_tokens = tokenizer.batch_encode_plus([uncond_prompt], padding="max_length", max_length=77).input_ids
+            uncond_tokens = tokenizer.batch_encode_plus(
+                [uncond_prompt], padding="max_length", max_length=77
+            ).input_ids
             uncond_tokens = torch.tensor(uncond_tokens, dtype=torch.long, device=device)
 
             # (Batch_Size, Seq_Len) -> (Batch_Size, Seq_Len, Dim)
@@ -63,9 +66,11 @@ def generate(
             context = torch.cat([cond_context, uncond_context])
         else: 
             # Conver it into a list of tokens
-            tokens = tokenizer.batch_encode_plus([prompt], padding="max_length", max_length=77).input_ids
+            tokens = tokenizer.batch_encode_plus(
+                [prompt], padding="max_length", max_length=77
+            ).input_ids
             tokens = torch.tensor(tokens, dtype=torch.long, device=device)
-
+            # (Batch_Size, Seq_Len) -> (Batch_Size, Seq_Len, Dim)
             context = clip(tokens)
 
         to_idle(clip)
@@ -131,11 +136,10 @@ def generate(
 
             if do_cfg:
                 output_cond, output_uncond = model_output.chunk(2)
-                model_output = cfg_scale * (output_cond - output_uncond) + output_cond # This is the formula found in classifier_free_guidance.png
+                model_output = cfg_scale * (output_cond - output_uncond) + output_uncond # This is the formula found in classifier_free_guidance.png
 
             # Now we are going to remove the noise predicted by the UNET 
             latents = sampler.step(timestep, latents, model_output)
-        
         to_idle(diffusion)
 
         decoder = models["decoder"]
@@ -184,9 +188,7 @@ def get_time_embedding(timestep: int):
     x = torch.tensor([timestep], dtype=torch.float32)[:,None] * freqs[None]
 
     # (1, 320)
-    x = torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
-
-    return x
+    return torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
 
 
 

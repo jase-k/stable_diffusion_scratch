@@ -6,3 +6,6 @@
 - Animation of cfg through the unet
 - example of through the scheduler 
 - Why I went down this rabbit hole
+  - Plotmaster.ai
+  - Consistent Characters
+  - Attempts Dreambooth, Textual Inversion, LORAs, Inference (Consistent Story)

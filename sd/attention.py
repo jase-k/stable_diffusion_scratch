@@ -42,7 +42,7 @@ class SelfAttention(nn.Module):
             #      [0, 0, 0]
             mask = torch.ones_like(weight, dtype=torch.bool).triu(1) # Upper Triangular Matrix: https://pytorch.org/docs/stable/generated/torch.triu.html
             # adding mask to the weight matrix to turn all the values in the upper triangle to -inf (during softmax, they will be 0)
-            weight = weight.masked_fill(mask, -torch.inf) # Masked Fill: https://pytorch.org/docs/stable/generated/torch.masked_fill.html
+            weight = weight.masked_fill_(mask, -torch.inf) # Masked Fill: https://pytorch.org/docs/stable/generated/torch.masked_fill.html
 
         weight /= math.sqrt(self.d_head)
 
