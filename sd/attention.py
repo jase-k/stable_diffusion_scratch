@@ -15,7 +15,6 @@ class SelfAttention(nn.Module):
 
     def forward(self, x, causal_mask=False):
         # x: # (Batch_Size, Seq_Len, Dim)
-        print(x.shape)
         # (Batch_Size, Seq_Len, Dim)
         input_shape = x.shape 
         

@@ -5,6 +5,9 @@ from diffusion import Diffusion
 
 import model_converter 
 
+# This implies the weights for Stable diffusion were saved like this: 
+# torch.save({"encoder": encoder.state_dict(), "decoder": decoder.state_dict(), "diffusion": diffusion.state_dict(), "clip": clip.state_dict()}, "path/to/save/weights.pt")
+
 def preload_models_from_standard_weights(ckpt_path, device):
     state_dict = model_converter.load_from_standard_weights(ckpt_path, device)
 

@@ -33,3 +33,8 @@ Positional encoding. The same for every sentence that transforms the encodings v
 
 # Special Thanks: 
 [Umar Jamil's Youtube Video](https://www.youtube.com/watch?v=ZBKpAp_6TGI)
+
+
+Research that inspired me to create this: 
+- [ConsiStory](https://arxiv.org/pdf/2402.03286.pdf)
+- []()
