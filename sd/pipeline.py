@@ -1,4 +1,6 @@
 import torch
+import os, time
+from PIL import Image
 import numpy as np
 from tqdm import tqdm
 from ddpm import DDPMSampler
@@ -73,6 +75,17 @@ def generate(
             # (Batch_Size, Seq_Len) -> (Batch_Size, Seq_Len, Dim)
             context = clip(tokens)
 
+        ###### Checkpoint 1: Save the context tensor to a text file for analysis ######
+        context_filename = "../checkpoints/post_clip_output.txt"
+
+        with open(context_filename, "w") as file:
+            file.write("# This is the output of the text embedding layer of the CLIP model # \n\n")
+            file.write("Your Prompt (below) has been encoded into the following embedding: \n\n" + prompt + "\n\n")
+            file.write(str(context.shape) + "\n")
+            file.write(str(context.cpu().numpy()))
+        print(f"Context tensor saved to {context_filename}")
+        ###### Checkpoint END: 1 ######
+
         to_idle(clip)
 
         # Sampler is referred to as the Scheduler in the diffusion.png image in images
@@ -85,11 +98,13 @@ def generate(
         latents_shape = (1, 4, LATENTS_HEIGHT, LATENTS_WIDTH)
 
         if input_image:
+            # latents_shape = (1, 3, LATENTS_HEIGHT, LATENTS_WIDTH)
             encoder = models["encoder"]
             encoder.to(device)
 
-            input_image_tensor = input_image. resize((WIDTH, HEIGHT))
-            input_image_tensor = np.array(input_image_tensor) # this creates a (512, 512, 3) tensor 3 for each color channel (RGB)
+            input_image_tensor = input_image.resize((WIDTH, HEIGHT))
+            input_image_tensor = np.array(input_image_tensor.convert("RGB")) # this creates a (512, 512, 3) tensor 3 for each color channel (RGB)
+
 
             input_image_tensor = torch.tensor(input_image_tensor, dtype=torch.float32)
             input_image_tensor = rescale(input_image_tensor, (0,255), (-1,1)) # each pixel was between 0 and 255, now it is between -1 and 1
@@ -104,14 +119,69 @@ def generate(
             input_image_tensor = input_image_tensor.permute(0, 3, 1, 2)
 
             encoder_noise = torch.randn(latents_shape, generator=generator, device=device)
+            
+            # Before passing the input_image_tensor to the encoder, ensure it's on the same device as the encoder.
+            input_image_tensor = input_image_tensor.to(device)
 
             # run the image through the encoder of the VAE
             latents = encoder(input_image_tensor, encoder_noise) # This gets us to the Z box in diffusion.png in the images folder. 
+
+            ######### Checkpoint: 2.a Image Encoded #########
+            # Save the latents tensor to a text file for analysis
+            context_filename = "../checkpoints/post_encoder_output.txt"
+
+            with open(context_filename, "w") as file:
+                file.write("# This is the output of the Encoder -> It will be random noise if no image is provided # \n\n")
+                file.write(str(latents.shape) + "\n")
+                file.write(str(latents.cpu().numpy()))
+            print(f"Context tensor saved to {context_filename}")
+
+            # Directly rescale the latents tensor from (-1, 1) to (0, 255) and convert to numpy array for visualization
+            visual_latents = rescale(latents, (-1, 1), (0, 255), clamp=True)
+            visual_latents = visual_latents.permute(0, 2, 3, 1)  # (Batch_Size, Channel, Height, Width) -> (Batch_Size, Height, Width, Channel)
+            visual_latents = visual_latents.to("cpu", torch.uint8).numpy()
+
+            # Save the visual representation of latents to a file
+            output_image_path = os.path.join("../checkpoints/", f"post_encoder_output.png")
+            
+            Image.fromarray(visual_latents[0]).save(output_image_path)
+            print(f"Latent visualization saved to {output_image_path}")
+
+            ######### Checkpoint END: 2.a Image Encoded #########
+
+            # Add noise to the latents (the encoded input image)
+            # (Batch_Size, 4, Latents_Height, Latents_Width)
+            sampler.set_strength(strength=strength)
+            latents = sampler.add_noise(latents, sampler.timesteps[0])
+
 
             to_idle(encoder)
         else:
             # If we are doing text-to-image, start with random noise N(0, I)
             latents = torch.randn(latents_shape, generator=generator, device=device)
+
+        ######### Checkpoint: 2.b Image Encoded  + Noised #########
+        # Save the latents tensor to a text file for analysis
+        context_filename = "../checkpoints/post_encoder_noise_output.txt"
+
+        with open(context_filename, "w") as file:
+            file.write("# This is the output of the Encoder -> It will be random noise if no image is provided # \n\n")
+            file.write(str(latents.shape) + "\n")
+            file.write(str(latents.cpu().numpy()))
+        print(f"Context tensor saved to {context_filename}")
+
+        # Directly rescale the latents tensor from (-1, 1) to (0, 255) and convert to numpy array for visualization
+        visual_latents = rescale(latents, (-1, 1), (0, 255), clamp=True)
+        visual_latents = visual_latents.permute(0, 2, 3, 1)  # (Batch_Size, Channel, Height, Width) -> (Batch_Size, Height, Width, Channel)
+        visual_latents = visual_latents.to("cpu", torch.uint8).numpy()
+
+        # Save the visual representation of latents to a file
+        output_image_path = os.path.join("../checkpoints/", f"post_encoder_noise_output.png")
+        
+        Image.fromarray(visual_latents[0]).save(output_image_path)
+        print(f"Latent visualization saved to {output_image_path}")
+
+        ######### Checkpoint END: 2.b Image Encoded  + Noised #########
 
         diffusion = models["diffusion"]
         diffusion.to(device)
@@ -137,9 +207,53 @@ def generate(
             if do_cfg:
                 output_cond, output_uncond = model_output.chunk(2)
                 model_output = cfg_scale * (output_cond - output_uncond) + output_uncond # This is the formula found in classifier_free_guidance.png
+            
+            ######### Checkpoint: 3.n Unet Step #########
+            # Save the latents tensor to a text file for analysis
+            context_filename = f"../checkpoints/unets/{i}.txt"
+
+            with open(context_filename, "w") as file:
+                file.write("# This is the output of the Encoder -> It will be random noise if no image is provided # \n\n")
+                file.write(str(model_output.shape) + "\n")
+                file.write(str(model_output.cpu().numpy()))
+            print(f"Context tensor saved to {context_filename}")
+
+            # Directly rescale the latents tensor from (-1, 1) to (0, 255) and convert to numpy array for visualization
+            visual_latents = rescale(model_output, (-1, 1), (0, 255), clamp=True)
+            visual_latents = visual_latents.permute(0, 2, 3, 1)  # (Batch_Size, Channel, Height, Width) -> (Batch_Size, Height, Width, Channel)
+            visual_latents = visual_latents.to("cpu", torch.uint8).numpy()
+
+            # Save the visual representation of latents to a file
+            output_image_path = os.path.join("../checkpoints/", f"../checkpoints/unets/{i}.png")
+            
+            Image.fromarray(visual_latents[0]).save(output_image_path)
+            print(f"Latent visualization saved to {output_image_path}")
 
             # Now we are going to remove the noise predicted by the UNET 
             latents = sampler.step(timestep, latents, model_output)
+
+            ######### Checkpoint: 4.n Sampler Step #########
+            # Save the latents tensor to a text file for analysis
+            context_filename = f"../checkpoints/sampler/{i}.txt"
+
+            with open(context_filename, "w") as file:
+                file.write("# This is the output of the Encoder -> It will be random noise if no image is provided # \n\n")
+                file.write(str(latents.shape) + "\n")
+                file.write(str(latents.cpu().numpy()))
+            print(f"Context tensor saved to {context_filename}")
+
+            # Directly rescale the latents tensor from (-1, 1) to (0, 255) and convert to numpy array for visualization
+            visual_latents = rescale(latents, (-1, 1), (0, 255), clamp=True)
+            visual_latents = visual_latents.permute(0, 2, 3, 1)  # (Batch_Size, Channel, Height, Width) -> (Batch_Size, Height, Width, Channel)
+            visual_latents = visual_latents.to("cpu", torch.uint8).numpy()
+
+            # Save the visual representation of latents to a file
+            output_image_path = os.path.join("../checkpoints/", f"../checkpoints/sampler/{i}.png")
+            
+            Image.fromarray(visual_latents[0]).save(output_image_path)
+            print(f"Latent visualization saved to {output_image_path}")
+
+            ######### Checkpoint END: 4.n Sampler Step #########
         to_idle(diffusion)
 
         decoder = models["decoder"]

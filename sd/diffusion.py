@@ -288,14 +288,12 @@ class UNET(nn.Module):
 
         skip_connections = []
         for index, layers in enumerate(self.encoders):
-            print(f"Processing encoder layer {index}")
             x = layers(x, context, time)
             skip_connections.append(x)
 
         x = self.bottleneck(x, context, time)
 
         for index, layers in enumerate(self.decoders):
-            print(f"Processing decoder layer {index}")
 
             # Since we always concat with the skip connection of the encoder, the number of features increases before being sent to the decoder's layer
             x = torch.cat((x, skip_connections.pop()), dim=1) 
