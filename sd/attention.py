@@ -7,7 +7,7 @@ class SelfAttention(nn.Module):
     def __init__(self, n_heads, d_embed, in_proj_bias=True, out_proj_bias=True):
         super().__init__()
         # This combines the Wq, Wk and Wv matrices into one matrix
-        self.in_proj = nn.Linear(d_embed, 3 * d_embed, bias=in_proj_bias) # Multiplying 3 because rgb
+        self.in_proj = nn.Linear(d_embed, 3 * d_embed, bias=in_proj_bias) # This later becomes 3 separate matrices for Wq, Wk and Wv
         # This one represents the Wo matrix
         self.out_proj = nn.Linear(d_embed, d_embed, bias=out_proj_bias)
         self.n_heads = n_heads
@@ -66,6 +66,7 @@ class SelfAttention(nn.Module):
 class CrossAttention(nn.Module):
 
     # d_cross represents the Keys and Values from the outside source.
+    # d_embed represents the embedding dimensions -> 512 in this case
     def __init__(self, n_heads: int, d_embed: int, d_cross: int, in_proj_bias=True, out_proj_bias=True):
         super().__init__()
         self.q_proj = nn.Linear(d_embed, d_embed, bias=in_proj_bias)
