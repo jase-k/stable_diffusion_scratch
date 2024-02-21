@@ -24,7 +24,8 @@ def generate(
         seed=None,
         device=None,
         idle_device=None, # This is the device that the model will be moved to when it is not being used (i.e. moved to the CPU when the GPU is not being used)
-        tokenizer=None
+        tokenizer=None,
+        num_of_images=1
 ):
     with torch.no_grad():
         if not (0 < strength <= 1):
@@ -44,6 +45,7 @@ def generate(
         clip = models["clip"]
         clip.to(device)
 
+        # cfg stands for Classifier Free Guidance
         if do_cfg:
             # Conver the prompt into toekns using the tokenizer
             cond_tokens = tokenizer.batch_encode_plus(
@@ -74,6 +76,47 @@ def generate(
             tokens = torch.tensor(tokens, dtype=torch.long, device=device)
             # (Batch_Size, Seq_Len) -> (Batch_Size, Seq_Len, Dim)
             context = clip(tokens)
+            print(f"Context shape: {context.shape}")
+        
+        # interleave is needed here instead of repeat because we want the values stacked: 
+        # >>> c = torch.tensor([[[1,2,3],[4,5,6],[7,8,9]],[[2,4,6],[8,10,12],[14,16,18]]])
+        # >>> c.shape
+        # torch.Size([2, 3, 3])
+        # >>> c.repeat(2,1,1)
+        # tensor([[[ 1,  2,  3],
+        #          [ 4,  5,  6],
+        #          [ 7,  8,  9]],
+
+        #         [[ 2,  4,  6],
+        #          [ 8, 10, 12],
+        #          [14, 16, 18]],
+
+        #         [[ 1,  2,  3],
+        #          [ 4,  5,  6],
+        #          [ 7,  8,  9]],
+
+        #         [[ 2,  4,  6],
+        #          [ 8, 10, 12],
+        #          [14, 16, 18]]])
+        # >>> c.repeat_interleave(2, dim=0)
+        # tensor([[[ 1,  2,  3],
+        #          [ 4,  5,  6],
+        #          [ 7,  8,  9]],
+
+        #         [[ 1,  2,  3],
+        #          [ 4,  5,  6],
+        #          [ 7,  8,  9]],
+
+        #         [[ 2,  4,  6],
+        #          [ 8, 10, 12],
+        #          [14, 16, 18]],
+
+        #         [[ 2,  4,  6],
+        #          [ 8, 10, 12],
+        #          [14, 16, 18]]])
+        # torch.Size([4, 3, 3])
+
+        context = context.repeat_interleave(num_of_images, dim=0)
 
         ###### Checkpoint 1: Save the context tensor to a text file for analysis ######
         context_filename = "../checkpoints/post_clip_output.txt"
@@ -95,7 +138,7 @@ def generate(
         else:
             raise ValueError(f"Unknown sampler {sampler_name}")
         
-        latents_shape = (1, 4, LATENTS_HEIGHT, LATENTS_WIDTH)
+        latents_shape = (num_of_images, 4, LATENTS_HEIGHT, LATENTS_WIDTH)
 
         if input_image:
             # latents_shape = (1, 3, LATENTS_HEIGHT, LATENTS_WIDTH)
@@ -176,13 +219,13 @@ def generate(
         visual_latents = visual_latents.to("cpu", torch.uint8).numpy()
 
         # Save the visual representation of latents to a file
-        output_image_path = os.path.join("../checkpoints/", f"post_encoder_noise_output.png")
         
-        Image.fromarray(visual_latents[0]).save(output_image_path)
+        for i, vl in enumerate(visual_latents):
+            output_image_path = os.path.join("../checkpoints/", f"post_encoder_noise_output_{i}.png")
+            Image.fromarray(vl).save(output_image_path)
         print(f"Latent visualization saved to {output_image_path}")
 
         ######### Checkpoint END: 2.b Image Encoded  + Noised #########
-
         diffusion = models["diffusion"]
         diffusion.to(device)
 
@@ -265,7 +308,7 @@ def generate(
         images = rescale(images, (-1, 1), (0, 255), clamp=True) # scaling the pixel values back to 0-255 to display image as rgb
         images = images.permute(0, 2, 3, 1) # (Batch_Size, Channel, Height, Width) -> (Batch_Size, Height, Width, Channel)
         images = images.to("cpu", torch.uint8).numpy()
-        return images[0]
+        return images
 
 def rescale(x, old_range, new_range, clamp=False):
     """

@@ -4,7 +4,7 @@ from PIL import Image
 from pathlib import Path
 from transformers import CLIPTokenizer
 import torch
-import os
+import os, json
 import time
 
 # Total memory
@@ -54,7 +54,7 @@ do_cfg = True
 cfg_scale = 7.5 # min: 1, max: 14
 
 ## IMAGE TO IMAGE
-
+num_images = 3
 input_image = None
 # Comment to disable image to image
 image_path = "../input_images/arms_crossed.jpg"
@@ -70,7 +70,7 @@ sampler = "ddpm"
 num_inference_steps = 45
 seed = 1939591103
 
-output_image = pipeline.generate(
+output_images = pipeline.generate(
     prompt=prompt,
     uncond_prompt=uncond_prompt,
     input_image=input_image,
@@ -84,9 +84,28 @@ output_image = pipeline.generate(
     device=DEVICE,
     idle_device="cpu",
     tokenizer=tokenizer,
+    num_of_images=num_images
 )
 
 # Combine the input image and the output image into a single image.
 import time
 timestamp = str(int(time.time()))
-Image.fromarray(output_image).save(f"../output_images/final_{timestamp}.png")
+for i, output_image in enumerate(output_images):
+    os.makedirs(f"../output_images/{timestamp}", exist_ok=True)
+    Image.fromarray(output_image).save(f"../output_images/{timestamp}/{i}_final.png")
+
+# Save output image with metadata
+metadata = {
+    "prompt": prompt,
+    "uncond_prompt": uncond_prompt,
+    "strength": strength,
+    "do_cfg": do_cfg,
+    "cfg_scale": cfg_scale,
+    "sampler": sampler,
+    "num_inference_steps": num_inference_steps,
+    "seed": seed,
+    "num_of_images": len(output_images)
+}
+metadata_filename = f"../output_images/{timestamp}/metadata.json"
+with open(metadata_filename, 'w') as f:
+    json.dump(metadata, f, indent=4)
